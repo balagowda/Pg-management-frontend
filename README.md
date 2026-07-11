@@ -103,11 +103,28 @@ projects actually integrate.
 - **Typed API client**: `src/api/types.ts` is hand-typed from the spec's Section 1. Follow-up:
   generate it from the backend's live OpenAPI doc (`/v3/api-docs`) with `openapi-typescript` once
   the backend is stable, per the spec's Section 3.4, so the two can't silently drift apart.
+- **Call / WhatsApp actions**: `src/lib/whatsapp.ts` (`waLink`, `reminderMessage`,
+  `receiptMessage`, `telLink`) ported from the Android app's message templates, used on Guest
+  Detail, Defaulters rows, and the "Send WhatsApp receipt" option in `RecordPaymentDialog`. These
+  are pure client-side `tel:`/`wa.me` links — no backend involvement.
+- **Theme toggle**: `src/design/useTheme.ts` is a small Zustand store (not persisted via the
+  `persist` middleware — it writes directly to `localStorage` and applies a `.light`/`.dark`
+  class on `<html>` synchronously at module load, imported eagerly from `main.tsx` so there's no
+  flash of the wrong theme on reload).
+- **Today's Focus dashboard row**: feature-detected via `dashboard.rentDueToday !== undefined`
+  (see `DashboardDto` in `src/api/types.ts`) since the deployed backend doesn't return
+  `rentDueToday`/`expectedToday`/`checkInsToday` yet — this is the one gap in the spec that needs
+  a backend change (Section 1.7a); the frontend is ready and will render the row the moment the
+  backend ships those fields.
 
 ## Known gaps / follow-ups
 
 - `PaymentDto` `DELETE` endpoint exists on the backend but has no UI action (matches the spec —
   "no UI action needs it in v1").
+- Dashboard "Today's Focus" row won't render until the backend adds `rentDueToday`/
+  `expectedToday`/`checkInsToday` to `DashboardDto` (Section 1.7a — a backend change, not
+  something the frontend can work around without duplicating due-date-clamping logic client-side
+  across every guest/payment).
 - The Playwright suite is one golden-path spec, not full coverage of every CRUD flow; extend
   `e2e/` as more flows need contract-level confidence.
 - Bundle is a single ~1MB JS chunk (Recharts + Radix + the app). Worth revisiting with route-level

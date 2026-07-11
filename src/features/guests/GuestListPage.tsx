@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Plus, Users } from 'lucide-react';
+import { Plus, Search, Users } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/EmptyState';
 import { ErrorState } from '@/components/ErrorState';
@@ -34,6 +35,7 @@ import { GuestFormDialog } from './GuestFormDialog';
 export function GuestListPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const pgId = searchParams.get('pgId') ?? '';
+  const query = searchParams.get('q') ?? '';
 
   const { data: pgs } = usePgs();
   const { data: rooms } = useRooms();
@@ -51,6 +53,25 @@ export function GuestListPage() {
   function pgLabel(id: string) {
     return pgs?.find((p) => p.id === id)?.name ?? '—';
   }
+
+  function updateParam(key: string, value: string) {
+    const next = new URLSearchParams(searchParams);
+    if (!value || value === 'all') next.delete(key);
+    else next.set(key, value);
+    setSearchParams(next);
+  }
+
+  const filteredGuests = useMemo(() => {
+    if (!query.trim()) return guests ?? [];
+    const q = query.trim().toLowerCase();
+    return (guests ?? []).filter(
+      (guest) =>
+        guest.name.toLowerCase().includes(q) ||
+        guest.phone.toLowerCase().includes(q) ||
+        roomLabel(guest.roomId).toLowerCase().includes(q),
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [guests, rooms, query]);
 
   function openCreate() {
     setEditing(undefined);
@@ -78,16 +99,17 @@ export function GuestListPage() {
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-xl font-semibold text-text-primary">Guests</h1>
-        <div className="flex items-center gap-3">
-          <Select
-            value={pgId || 'all'}
-            onValueChange={(value) => {
-              const next = new URLSearchParams(searchParams);
-              if (value === 'all') next.delete('pgId');
-              else next.set('pgId', value);
-              setSearchParams(next);
-            }}
-          >
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative w-56">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-tertiary" />
+            <Input
+              value={query}
+              onChange={(e) => updateParam('q', e.target.value)}
+              placeholder="Search name, phone, room…"
+              className="pl-9"
+            />
+          </div>
+          <Select value={pgId || 'all'} onValueChange={(value) => updateParam('pgId', value)}>
             <SelectTrigger className="w-48">
               <SelectValue placeholder="All PGs" />
             </SelectTrigger>
@@ -127,7 +149,15 @@ export function GuestListPage() {
         />
       )}
 
-      {!isLoading && !isError && guests && guests.length > 0 && (
+      {!isLoading && !isError && guests && guests.length > 0 && filteredGuests.length === 0 && (
+        <EmptyState
+          icon={Search}
+          title="No guests match your search"
+          description="Try a different name, phone, or room number."
+        />
+      )}
+
+      {!isLoading && !isError && filteredGuests.length > 0 && (
         <Table>
           <TableHeader>
             <TableRow>
@@ -140,7 +170,7 @@ export function GuestListPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {guests.map((guest) => (
+            {filteredGuests.map((guest) => (
               <TableRow key={guest.id}>
                 <TableCell>
                   <Link

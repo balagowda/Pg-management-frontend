@@ -9,6 +9,7 @@ import { RegisterPage } from '@/features/auth/RegisterPage';
 import { DashboardPage } from '@/features/dashboard/DashboardPage';
 import { PgListPage } from '@/features/pgs/PgListPage';
 import { RoomListPage } from '@/features/rooms/RoomListPage';
+import { RoomDetailPage } from '@/features/rooms/RoomDetailPage';
 import { GuestListPage } from '@/features/guests/GuestListPage';
 import { GuestDetailPage } from '@/features/guests/GuestDetailPage';
 import { PaymentListPage } from '@/features/payments/PaymentListPage';
@@ -49,6 +50,7 @@ const router = createBrowserRouter([
           { path: 'dashboard', element: <DashboardPage /> },
           { path: 'pgs', element: <PgListPage /> },
           { path: 'pgs/:pgId', element: <RoomListPage /> },
+          { path: 'pgs/:pgId/rooms/:roomId', element: <RoomDetailPage /> },
           { path: 'guests', element: <GuestListPage /> },
           { path: 'guests/:guestId', element: <GuestDetailPage /> },
           { path: 'payments', element: <PaymentListPage /> },

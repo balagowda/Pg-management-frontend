@@ -92,6 +92,15 @@ export interface DashboardDto {
   /** last 7-14 days' collected amount, ascending by date */
   sparkline: number[];
   recentActivity: RecentActivityEntry[];
+  // "Today's Focus" fields — not yet returned by the deployed backend (Section
+  // 1.7a of the spec). Optional and feature-detected: the dashboard only
+  // renders the Today's Focus row once these actually show up in a response.
+  /** count of unpaid current-month payments whose guest's due date is today */
+  rentDueToday?: number;
+  /** sum of outstanding amount for those same payments */
+  expectedToday?: number;
+  /** count of guests whose joiningDate is today */
+  checkInsToday?: number;
 }
 
 export interface DefaulterDto {

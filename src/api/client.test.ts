@@ -39,7 +39,9 @@ describe('apiClient 401 refresh-and-retry interceptor', () => {
 
   it('retries the original request once after a successful refresh', async () => {
     apiMock.onGet('/pgs').replyOnce(401);
-    apiMock.onGet('/pgs').replyOnce(200, [{ id: '1', name: 'Green Villa', address: 'x', city: 'y' }]);
+    apiMock
+      .onGet('/pgs')
+      .replyOnce(200, [{ id: '1', name: 'Green Villa', address: 'x', city: 'y' }]);
     globalMock.onPost(/\/auth\/refresh$/).replyOnce(200, {
       token: 'new-token',
       refreshToken: 'new-refresh-token',
@@ -81,7 +83,10 @@ describe('apiClient 401 refresh-and-retry interceptor', () => {
     let refreshCallCount = 0;
     globalMock.onPost(/\/auth\/refresh$/).reply(() => {
       refreshCallCount += 1;
-      return [200, { token: 'new-token', refreshToken: 'rotated-refresh', owner: OWNER, expiresIn: 43200 }];
+      return [
+        200,
+        { token: 'new-token', refreshToken: 'rotated-refresh', owner: OWNER, expiresIn: 43200 },
+      ];
     });
 
     await Promise.all([apiClient.get('/pgs'), apiClient.get('/guests')]);

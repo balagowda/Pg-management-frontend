@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ErrorState } from '@/components/ErrorState';
 import { EmptyState } from '@/components/EmptyState';
+import { ContactActionsRow } from '@/components/ContactActionsRow';
 import {
   Table,
   TableBody,
@@ -16,8 +17,9 @@ import {
 } from '@/components/ui/table';
 import { GuestStatusChip, PaymentStatusChip } from '@/components/StatusChip';
 import { formatCurrency } from '@/lib/formatCurrency';
-import { formatDateOnly, formatMonth, formatTimestamp } from '@/lib/formatDate';
+import { formatDateOnly, formatMonth, formatTimestamp, currentMonthString } from '@/lib/formatDate';
 import { computeEffectiveStatus } from '@/lib/effectiveStatus';
+import { reminderMessage } from '@/lib/whatsapp';
 import type { PaymentDto } from '@/api/types';
 import { usePg } from '@/features/pgs/usePgs';
 import { useRooms } from '@/features/rooms/useRooms';
@@ -51,6 +53,14 @@ export function GuestDetailPage() {
   const room = rooms?.find((r) => r.id === guest.roomId);
   const sortedPayments = [...(payments ?? [])].sort((a, b) => (a.month < b.month ? 1 : -1));
 
+  const outstandingPayment =
+    sortedPayments.find((p) => p.month === currentMonthString() && p.status !== 'PAID') ??
+    sortedPayments.find((p) => p.status !== 'PAID');
+  const outstandingAmount = outstandingPayment
+    ? Math.max(outstandingPayment.amountDue - outstandingPayment.amountPaid, 0)
+    : 0;
+  const outstandingMonthLabel = formatMonth(outstandingPayment?.month ?? currentMonthString());
+
   return (
     <div className="flex flex-col gap-6">
       <div>
@@ -63,12 +73,22 @@ export function GuestDetailPage() {
           <ArrowLeft className="h-4 w-4" />
           All guests
         </Button>
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-xl font-semibold text-text-primary">{guest.name}</h1>
-          <Button variant="outline" onClick={() => setEditOpen(true)}>
-            <Pencil className="h-4 w-4" />
-            Edit
-          </Button>
+          <div className="flex items-center gap-2">
+            <ContactActionsRow
+              phone={guest.phone}
+              reminderMessage={reminderMessage(
+                guest.name,
+                outstandingAmount,
+                outstandingMonthLabel,
+              )}
+            />
+            <Button variant="outline" onClick={() => setEditOpen(true)}>
+              <Pencil className="h-4 w-4" />
+              Edit
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -153,6 +173,8 @@ export function GuestDetailPage() {
         onOpenChange={(open) => !open && setRecordTarget(undefined)}
         payment={recordTarget}
         guestName={guest.name}
+        guestPhone={guest.phone}
+        pgName={pg?.name}
       />
     </div>
   );

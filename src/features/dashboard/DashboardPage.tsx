@@ -1,4 +1,14 @@
-import { AlertTriangle, Bed, Building2, DoorOpen, RefreshCw, Users, Wallet } from 'lucide-react';
+import {
+  AlertTriangle,
+  Bed,
+  Building2,
+  CalendarClock,
+  CalendarPlus,
+  DoorOpen,
+  RefreshCw,
+  Users,
+  Wallet,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ErrorState } from '@/components/ErrorState';
@@ -60,6 +70,29 @@ export function DashboardPage() {
           </div>
         </div>
       </GradientHeroCard>
+
+      {data.rentDueToday !== undefined && (
+        <div>
+          <h2 className="mb-3 text-sm font-semibold text-text-secondary">Today's Focus</h2>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <KpiCard
+              icon={CalendarClock}
+              label="Rent due today"
+              value={String(data.rentDueToday)}
+            />
+            <KpiCard
+              icon={Wallet}
+              label="Expected today"
+              value={formatCurrency(data.expectedToday ?? 0)}
+            />
+            <KpiCard
+              icon={CalendarPlus}
+              label="Check-ins today"
+              value={String(data.checkInsToday ?? 0)}
+            />
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <KpiCard

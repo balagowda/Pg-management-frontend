@@ -53,8 +53,14 @@ export function PaymentListPage() {
   function guestName(guestId: string) {
     return guests?.find((g) => g.id === guestId)?.name ?? '—';
   }
+  function guestPhone(guestId: string) {
+    return guests?.find((g) => g.id === guestId)?.phone;
+  }
   function guestDueDay(guestId: string) {
     return guests?.find((g) => g.id === guestId)?.dueDay ?? 5;
+  }
+  function pgName(pgId: string) {
+    return pgs?.find((p) => p.id === pgId)?.name;
   }
 
   function updateParam(key: string, value: string) {
@@ -152,6 +158,8 @@ export function PaymentListPage() {
         onOpenChange={(open) => !open && setRecordTarget(undefined)}
         payment={recordTarget}
         guestName={recordTarget ? guestName(recordTarget.guestId) : undefined}
+        guestPhone={recordTarget ? guestPhone(recordTarget.guestId) : undefined}
+        pgName={recordTarget ? pgName(recordTarget.pgId) : undefined}
       />
     </div>
   );

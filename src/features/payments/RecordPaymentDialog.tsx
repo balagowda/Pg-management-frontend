@@ -11,8 +11,11 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import { formatCurrency } from '@/lib/formatCurrency';
 import { normalizeNote } from '@/lib/normalizeNote';
+import { formatMonth } from '@/lib/formatDate';
+import { receiptMessage, waLink } from '@/lib/whatsapp';
 import { toErrorMessage } from '@/api/errors';
 import type { PaymentDto } from '@/api/types';
 import { useUpdatePayment } from './usePayments';
@@ -22,6 +25,8 @@ interface RecordPaymentDialogProps {
   onOpenChange: (open: boolean) => void;
   payment?: PaymentDto;
   guestName?: string;
+  guestPhone?: string;
+  pgName?: string;
 }
 
 export function RecordPaymentDialog({
@@ -29,10 +34,13 @@ export function RecordPaymentDialog({
   onOpenChange,
   payment,
   guestName,
+  guestPhone,
+  pgName,
 }: RecordPaymentDialogProps) {
   const updatePayment = useUpdatePayment();
   const [increment, setIncrement] = useState('');
   const [note, setNote] = useState('');
+  const [sendReceipt, setSendReceipt] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
   if (!payment) return null;
@@ -40,12 +48,14 @@ export function RecordPaymentDialog({
   const remaining = payment.amountDue - payment.amountPaid;
   const incrementValue = Number(increment) || 0;
   const projectedTotal = payment.amountPaid + incrementValue;
+  const canSendReceipt = !!guestPhone && !!guestName && !!pgName;
 
   function closeAndReset(next: boolean) {
     onOpenChange(next);
     if (!next) {
       setIncrement('');
       setNote('');
+      setSendReceipt(true);
     }
   }
 
@@ -62,6 +72,19 @@ export function RecordPaymentDialog({
         note: normalizeNote(note),
       });
       toast.success('Payment recorded');
+
+      // Pure client-side side effect after a successful save — never blocks
+      // the save itself on whether the WhatsApp tab actually opens.
+      if (sendReceipt && guestPhone && guestName && pgName) {
+        const message = receiptMessage(
+          guestName,
+          incrementValue,
+          formatMonth(payment.month),
+          pgName,
+        );
+        window.open(waLink(guestPhone, message), '_blank', 'noopener,noreferrer');
+      }
+
       closeAndReset(false);
     } catch (error) {
       toast.error(toErrorMessage(error));
@@ -108,6 +131,12 @@ export function RecordPaymentDialog({
               placeholder="Leave blank to keep the existing note"
             />
           </div>
+          {canSendReceipt && (
+            <label className="flex items-center gap-2 text-sm text-text-primary">
+              <Checkbox checked={sendReceipt} onCheckedChange={(v) => setSendReceipt(v === true)} />
+              Send WhatsApp receipt
+            </label>
+          )}
         </div>
 
         <DialogFooter>

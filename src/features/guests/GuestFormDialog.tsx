@@ -31,6 +31,7 @@ interface GuestFormDialogProps {
   onOpenChange: (open: boolean) => void;
   guest?: GuestDto;
   defaultPgId?: string;
+  defaultRoomId?: string;
 }
 
 const EMPTY_VALUES: GuestFormInput = {
@@ -45,7 +46,13 @@ const EMPTY_VALUES: GuestFormInput = {
   status: 'ACTIVE',
 };
 
-export function GuestFormDialog({ open, onOpenChange, guest, defaultPgId }: GuestFormDialogProps) {
+export function GuestFormDialog({
+  open,
+  onOpenChange,
+  guest,
+  defaultPgId,
+  defaultRoomId,
+}: GuestFormDialogProps) {
   const isEdit = !!guest;
   const { data: pgs } = usePgs();
   const createGuest = useCreateGuest();
@@ -81,10 +88,10 @@ export function GuestFormDialog({ open, onOpenChange, guest, defaultPgId }: Gues
               dueDay: guest.dueDay,
               status: guest.status,
             }
-          : { ...EMPTY_VALUES, pgId: defaultPgId ?? '' },
+          : { ...EMPTY_VALUES, pgId: defaultPgId ?? '', roomId: defaultRoomId ?? '' },
       );
     }
-  }, [open, guest, defaultPgId, reset]);
+  }, [open, guest, defaultPgId, defaultRoomId, reset]);
 
   async function onSubmit(values: GuestFormValues) {
     try {

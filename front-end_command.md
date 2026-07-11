@@ -37,6 +37,28 @@ rent collection and occupancy status, recording payments, adding guests/rooms. T
 CRUD-and-dashboard business tool, not a marketing site — optimize for information density,
 fast data entry, and keyboard-friendly forms over flashy motion.
 
+### 0.1 Gap audit — what's missing vs. the Android app, and where it's addressed below
+
+The app built from an earlier version of this prompt is live but skipped several things the
+Android client already does. Verified against the running `pg-frontend`/`pg-backend` source
+(not just the old prompt text) on 2026-07-10. Fix everything in this table:
+
+| Gap | Where it's specified below | Needs a backend change too? |
+|---|---|---|
+| Room detail page doesn't exist at all (`pgs/:pgId` only lists rooms in a table, no drill-in) | Section 3.2 route table, Section 4 | No |
+| Guest Detail has no Call / WhatsApp-reminder buttons | Section 1.11 (exact message templates), Section 4 | No |
+| Defaulters page is a read-only table — no Call / WhatsApp / Record actions per row | Section 1.11, Section 4 | No |
+| "Record Payment" has no "send WhatsApp receipt" option | Section 1.11 | No |
+| Dashboard has no "Today's Focus" row (rent due today / expected today / check-ins today) | Section 1.7a | **Yes — backend fields don't exist yet** |
+| Backend's `recentActivity` only ever emits `PAYMENT_RECEIVED`, never `GUEST_JOINED` | Section 1.7a | **Yes** |
+| PG list is a bare card grid — Android's "My PGs" leads with an occupancy hero + property-stats row | Section 1.3a, Section 4 | No |
+| PG detail (room list) has no search box or occupancy/sharing filter chips | Section 1.4a, Section 4 | No |
+| Guest list has a PG filter dropdown but no text search | Section 1.5a | No |
+| Settings page has no theme toggle — dark mode only follows OS `prefers-color-scheme`, no user override, nothing persisted | Section 4.1 (new) | No |
+
+Everything in this table gets its own spec below, inline in the section it belongs to, so this
+audit is just the map — implement from the sections it points to, not from this table alone.
+
 ---
 
 ## 1. Frozen contract — the backend API you're calling
@@ -98,6 +120,26 @@ session and redirect to `/login`. See Section 6.2 for the exact pattern.
 { "id": "string", "name": "string", "address": "string", "city": "string" }
 ```
 
+### 1.3a PG list page — lead with a "Property Overview", not a bare card grid
+
+Android's PG list ("My PGs") isn't just a card grid — it's a home view: an **Overall Occupancy**
+hero (ring or bar showing `occupiedBeds`/`totalBeds` across every PG) and a **Property
+Statistics** row (Revenue this month, Total PGs, Total Rooms) sit above the PG cards. No new
+endpoint is needed — the `pgs`/`rooms`/`guests` list responses plus `GET /dashboard` already
+carry everything required:
+
+```ts
+// src/features/pgs/PgListPage.tsx — compute the header from data you already fetch
+const totalBeds = rooms.reduce((sum, r) => sum + r.capacity, 0);
+const occupiedBeds = guests.filter((g) => g.status !== 'LEFT').length;
+const occupancyPercent = totalBeds === 0 ? 0 : Math.round((occupiedBeds / totalBeds) * 100);
+// revenueThisMonth: reuse the already-fetched DashboardDto rather than re-summing payments here
+```
+
+Layout, top to bottom: occupancy hero card (percent + "Occupied X · Vacant Y · Capacity Z"),
+then a 3-up stat row (Revenue this month / Total PGs / Total Rooms), then the existing PG card
+grid below (each card still shows a vacancy badge and an occupancy bar — keep that).
+
 ### 1.4 Rooms
 
 | Method | Path | Query | Body | Response |
@@ -113,6 +155,31 @@ session and redirect to `/login`. See Section 6.2 for the exact pattern.
 
 `capacity` must be a positive integer (≥ 1) — validate client-side before submit, the server
 also enforces this and returns 400 if violated.
+
+### 1.4a PG detail (room list) needs search + filters, and rooms need their own detail page
+
+Two gaps here, both frontend-only (no new endpoint — `GET /rooms?pgId=` and `GET /guests?pgId=`
+already carry everything needed):
+
+1. **The `pgs/:pgId` room list is missing what Android's PG detail screen has above the table:**
+   an occupancy summary card for *that PG* (`occupiedBeds`/`bedCount` computed from its rooms +
+   its guests, same formula as 1.3a but scoped to one `pgId`), a text search box (filter by
+   `roomNumber`, client-side substring match — there's no backend search-by-room-number
+   endpoint, do it in-memory against the already-fetched room list), and filter chips: an
+   occupancy filter (**All / Vacant / Full**, where Vacant = `occupants.length < capacity`) plus
+   auto-generated "sharing" chips built from the distinct `capacity` values actually present in
+   that PG's rooms (label them `2's`, `3's`, `4's`, …). All three filters (query AND occupancy
+   AND sharing) combine; empty result shows an empty state, not a blank table.
+
+2. **There is no room-detail page at all today.** Add a route `pgs/:pgId/rooms/:roomId`
+   (`RoomDetailPage.tsx`) reached by making each row in the room table clickable (it currently
+   isn't — only the edit/delete icon buttons are). This page needs:
+   - Three stat tiles: **Capacity** (`room.capacity`), **Occupied** (count of guests in this
+     room with `status !== 'LEFT'`), **Vacant** (`capacity - occupied`, floored at 0).
+   - A list of the guests currently in that room (name, phone, monthly rent, click-through to
+     `/guests/:guestId`), computed by filtering the already-fetched guest list by `roomId`.
+   - An "Add Guest" action that opens the guest form pre-filled with this `pgId`/`roomId`.
+   - Edit/Delete actions for the room itself (same as what's on the room-list row today).
 
 ### 1.5 Guests
 
@@ -145,6 +212,15 @@ instead of round-tripping a 400).
 **Creating a guest auto-creates a current-month `Payment` row server-side** (`amountDue =
 monthlyRent`, `amountPaid = 0`, `status = "PENDING"`) — after a successful guest create/update,
 refetch that guest's payments (or invalidate the payments query) so the UI shows it immediately.
+
+### 1.5a Guest list needs a text search box, not just the PG filter
+
+The guest list currently only has a PG dropdown filter (`?pgId=`) — Android's guest list also
+has a search field matching name, phone, **or room number**, combined with the PG filter (both
+active at once). No new endpoint needed: filter the already-fetched (or PG-filtered) guest list
+client-side, case-insensitive substring match against `guest.name`, `guest.phone`, and the
+joined room's `roomNumber`. Put the query in `?q=` alongside the existing `?pgId=` so the
+filtered view stays a shareable URL like the rest of the list pages (Section 3.2).
 
 ### 1.6 Payments
 
@@ -220,6 +296,46 @@ This is the app's home screen. Fetch it once on dashboard mount, expose a manual
 action, and consider a short `staleTime` (e.g. 30–60s) with TanStack Query rather than
 polling — it's cheap to refetch on navigation back to the tab.
 
+### 1.7a Dashboard gaps vs. Android — two of these need a backend change
+
+Verified against the live `pg-backend` source (`DashboardAggregationService.java`), not just
+this spec: the deployed backend's `DashboardDto` does **not** yet return three fields Android's
+dashboard shows in a "Today's Focus" row, and its `recentActivity` only ever emits
+`PAYMENT_RECEIVED` (never `GUEST_JOINED`, even though `guestName`/`amount`/`timestampMillis`
+already anticipates both — see the TS type in Section 3.4). This is the one place in this
+document where the frontend genuinely can't reach parity without a backend change — call it out
+explicitly rather than silently skip it:
+
+```jsonc
+// Fields Android's dashboard shows that DashboardDto doesn't return today — add these
+// server-side (DashboardAggregationService) rather than trying to fake them client-side, since
+// "expectedToday" and "rentDueToday" need the same due-date-clamping logic the backend already
+// implements for paymentsDueTomorrow (Section 4.3 of backend-prompt.md) — just for "today"
+// instead of "tomorrow":
+{
+  "rentDueToday": 0,      // int — count of unpaid current-month payments whose guest's due date == today
+  "expectedToday": 0,     // long — sum of `outstanding` for those same payments
+  "checkInsToday": 0      // int — count of guests whose joiningDate == today
+}
+```
+
+```jsonc
+// recentActivity — backend currently only emits this shape:
+{ "type": "PAYMENT_RECEIVED", "guestName": "string", "amount": 9500, "timestampMillis": 0 }
+// Add a GUEST_JOINED event (guests whose joiningDate is within the last 7 days, amount: null),
+// merge with PAYMENT_RECEIVED events, sort desc by timestampMillis, cap at 6 (Android's cap —
+// the backend currently caps at 10, tighten it to match).
+```
+
+**Frontend implementation guidance so this isn't a hard blocker:** feature-detect these three
+fields (`dashboard.rentDueToday !== undefined`) and only render the "Today's Focus" row once
+they're present — the TanStack Query response type should mark them optional
+(`rentDueToday?: number`, etc.) so the dashboard still builds and renders correctly against
+today's backend, and the row appears automatically the moment the backend ships them. Don't
+compute these client-side as a workaround (it would require fetching every guest's `joiningDate`
+and every payment's due date just for a top-of-dashboard KPI row — cheap for the backend to
+aggregate in one query, expensive and duplicative to reimplement in the browser).
+
 ### 1.8 Defaulters
 
 | Method | Path | Response |
@@ -238,6 +354,12 @@ polling — it's cheap to refetch on navigation back to the tab.
   "outstandingAmount": 10000
 }
 ```
+
+Android's defaulters list is not read-only — each row has **Call**, **WhatsApp**, and **Record**
+(payment) actions. The current web build renders this as a plain table with no actions at all;
+add all three per row. Exact Call/WhatsApp construction and message template: Section 1.11.
+Record opens the same `RecordPaymentDialog` used elsewhere (Section 1.6), pre-filled with this
+defaulter's `guestId`/`outstandingAmount`.
 
 ### 1.9 Search
 
@@ -269,6 +391,48 @@ Status codes you must handle distinctly in the UI: `400` (show field-level form 
 exist), `409` (only from strict `POST` create — "already exists" toast), `422` (semantically
 invalid but well-formed — show `detail` as the message), `500` (generic "something went wrong,
 try again" — never surface the raw response body).
+
+### 1.11 Guest contact actions — Call & WhatsApp (exact templates to port, currently missing)
+
+Two flows the Android app has that the current web build has **nowhere at all** (confirmed: no
+`tel:`/`wa.me` link exists anywhere in `GuestDetailPage.tsx` or `DefaultersPage.tsx` today):
+
+1. **Call button** — a plain `tel:` link, no phone-number normalization:
+   ```tsx
+   <a href={`tel:${guest.phone}`}>Call</a>
+   ```
+2. **WhatsApp reminder button** — opens `wa.me` with a prefilled message. Port this exactly
+   (ported verbatim from the Android app's `IntentUtils.kt` + `strings.xml`):
+   ```ts
+   // src/lib/whatsapp.ts
+   export function waLink(phone: string, message: string): string {
+     const digits = phone.replace(/\D/g, '');
+     const withCountryCode = digits.length === 10 ? `91${digits}` : digits;
+     return `https://wa.me/${withCountryCode}?text=${encodeURIComponent(message)}`;
+   }
+
+   export function reminderMessage(guestName: string, outstanding: number, monthLabel: string) {
+     // monthLabel format: "July 2026" (date-fns: format(monthDate, 'MMMM yyyy'))
+     return `Hi ${guestName}, a gentle reminder that your rent of ${formatCurrency(outstanding)} for ${monthLabel} is due. Please pay at the earliest. Thank you!`;
+   }
+
+   export function receiptMessage(guestName: string, amountPaid: number, monthLabel: string, pgName: string) {
+     return `Hi ${guestName}, we have received your payment of ${formatCurrency(amountPaid)} towards rent for ${monthLabel} at ${pgName}. Thank you! — PG Manager`;
+   }
+   ```
+   Render as `<a href={waLink(phone, message)} target="_blank" rel="noopener noreferrer">`.
+
+**Where these are used** (must exist on all of these — currently exist on none):
+- **Guest Detail page**: a Call button and a "Send Reminder" (WhatsApp) button next to the
+  existing "Record payment" button, using `reminderMessage(guest.name,
+  currentMonthOutstanding, currentMonthLabel)`.
+- **Defaulters page**: same two actions per row, using `reminderMessage(defaulter.guestName,
+  defaulter.outstandingAmount, currentMonthLabel)`, plus the existing Record action (see 1.8).
+- **Record Payment dialog**: add a "Send WhatsApp receipt" checkbox (default checked, matching
+  Android's `RecordPaymentDialog`'s "Save + Receipt" affordance). On successful save with the
+  box checked, open `waLink(guest.phone, receiptMessage(guest.name, amountJustPaid, monthLabel,
+  pgName))` in a new tab. This is a pure client-side side effect after the mutation succeeds —
+  no backend involvement, don't block the save on it.
 
 ---
 
@@ -367,15 +531,16 @@ never duplicate a fetch function across features.
 /login                          public
 /register                       public
 /                                RequireAuth layout (sidebar shell)
-  /dashboard                    default landing after login
-  /pgs                          list
-  /pgs/:pgId                    detail — rooms in this PG
-  /guests                       list (all PGs), filterable by pgId via query param
-  /guests/:guestId              detail — profile + payment history
+  /dashboard                    default landing after login — hero + Today's Focus (1.7a) + Business Overview
+  /pgs                          Property Overview: occupancy hero + stats row + PG card grid (1.3a)
+  /pgs/:pgId                    PG detail — occupancy summary + searchable/filterable room list (1.4a)
+  /pgs/:pgId/rooms/:roomId      room detail — capacity/occupied/vacant tiles + guests in room (1.4a) [NEW]
+  /guests                       list (all PGs), filterable by pgId AND searchable by name/phone/room (1.5a)
+  /guests/:guestId              detail — profile + Call/WhatsApp actions (1.11) + payment history
   /payments                     list, filterable by month/pgId/guestId via query params
-  /defaulters
+  /defaulters                   list with per-row Call/WhatsApp/Record actions (1.8, 1.11)
   /search?q=…                   full-page results (topbar search is a quick preview)
-  /settings                     owner profile, logout
+  /settings                     owner profile, Appearance (theme toggle, 4.1), logout
 ```
 
 Use `react-router`'s `useSearchParams` for the list filters (`pgId`, `month`, `guestId`, `q`) so
@@ -425,6 +590,30 @@ Implement these as CSS variables in `src/design/tokens.css`, wired into `tailwin
 `prefers-color-scheme`/a class-based toggle — same SYSTEM/LIGHT/DARK modes the Android app
 supports.
 
+### 4.1 Theme toggle — currently missing entirely, add it
+
+`tokens.css` already defines a full dark palette (`:root.dark { ... }`) and honors OS-level
+`prefers-color-scheme` automatically — but there is no user-facing control anywhere in the app,
+no persisted preference, and nothing in the code ever toggles a `.dark`/`.light` class. This
+means a user whose OS is in light mode has no way to preview dark mode, and vice versa, and
+their choice (if they had one) wouldn't survive a reload. Match Android's `PGThemeMode`
+(`SYSTEM`/`LIGHT`/`DARK`) exactly:
+
+```ts
+// src/design/useTheme.ts
+type ThemeMode = 'SYSTEM' | 'LIGHT' | 'DARK';
+
+// - persist the chosen mode to localStorage (key: "theme-mode")
+// - on mode change (and on app boot), set `document.documentElement.classList`:
+//     SYSTEM -> remove both '.light'/'.dark', let the prefers-color-scheme CSS block win
+//     LIGHT  -> add '.light', remove '.dark'
+//     DARK   -> add '.dark', remove '.light'
+// - expose { mode, setMode } from a small Zustand store or React context
+```
+
+Add a segmented control (System / Light / Dark) to the Settings page under an "Appearance"
+section — same three-way switch as the Android Profile screen. Wire it to `useTheme()`.
+
 **Component parity (build web equivalents, not literal ports):**
 - `KpiCard` → a fixed-height stat tile (icon, value, label, optional trend badge) for the
   dashboard grid — mirrors the Android `KpiCard` slots (icon/value/title/subtitle/trend/badge).
@@ -434,7 +623,13 @@ supports.
   mapping in `src/design/statusChip.ts` — never pick a chip color ad hoc at a call site.
 - `EmptyState` / `ErrorState` → required on every list view (empty PGs, empty guests, failed
   fetch with retry) — don't ship a bare blank screen or an unstyled error string.
-- A `GradientHeroCard`-equivalent for the dashboard's top revenue/collection summary.
+- A `GradientHeroCard`-equivalent for the dashboard's top revenue/collection summary, reused for
+  the PG-list "Overall Occupancy" hero (1.3a) and the PG-detail occupancy summary (1.4a) — one
+  component, three call sites, don't fork it three times.
+- `RoomStatTiles` → the Capacity/Occupied/Vacant three-tile row on the new room detail page
+  (1.4a) — same shape as `KpiCard` in compact mode, first tile filled solid like Android's.
+- `ContactActionsRow` → the Call/WhatsApp(/Record) button row (1.11), one shared component used
+  on both Guest Detail and each Defaulters row — don't duplicate the button markup between them.
 - Sidebar nav mirrors the Android bottom-nav's top-level sections (Dashboard, PGs, Guests,
   Payments, Defaulters) plus Search and Settings, since desktop affords a persistent sidebar
   instead of a bottom bar.
@@ -591,9 +786,23 @@ they meant to go.
       (Section 6.2), with a race-safe single-flight refresh.
 - [ ] All P0 read/write flows: PGs, Rooms, Guests, Payments — list, create, edit, delete (where
       the API supports it), each using client-generated UUIDs and PUT-as-upsert.
+- [ ] PG list leads with an Overall Occupancy hero + Property Statistics row above the card grid
+      (1.3a), not a bare card grid.
+- [ ] PG detail has a per-PG occupancy summary, a room search box, and All/Vacant/Full +
+      sharing-size filter chips (1.4a).
+- [ ] Room detail page (`pgs/:pgId/rooms/:roomId`) exists: Capacity/Occupied/Vacant tiles, the
+      guest list for that room, Add Guest action (1.4a) — this route doesn't exist today.
+- [ ] Guest list has a text search box (name/phone/room), combinable with the PG filter (1.5a).
+- [ ] Guest Detail has working Call and WhatsApp-reminder buttons using the exact message
+      templates in 1.11 — neither exists today.
+- [ ] Record Payment dialog has a "send WhatsApp receipt" option (1.11).
+- [ ] Defaulters page has per-row Call, WhatsApp, and Record actions (1.8, 1.11) — it's
+      read-only today.
 - [ ] Dashboard page rendering every `DashboardDto` field, including v2 fields (`sparkline`,
-      `trendPercent`, `recentActivity`).
-- [ ] Defaulters page, sorted as returned by the API.
+      `trendPercent`, `recentActivity`), plus a "Today's Focus" row for `rentDueToday`/
+      `expectedToday`/`checkInsToday` once the backend adds them (feature-detected, 1.7a).
+- [ ] Settings has a working System/Light/Dark theme toggle, persisted, applied via a
+      `.dark`/`.light` class (4.1) — dark mode is CSS-only with no user control today.
 - [ ] Global search (topbar quick results + a full `/search` page), debounced.
 - [ ] Status-chip color mapping centralized and used everywhere a `PaymentDto.status` or
       `GuestDto.status` is rendered — no ad hoc color picks.
