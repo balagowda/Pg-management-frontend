@@ -1,0 +1,122 @@
+/*
+ * "Indigo Pro" design tokens, ported from the Android app's
+ * ui/designsystem/foundation (AppColors, AppShapes, AppSpacing) so the web
+ * app reads as the same product on a bigger screen.
+ *
+ * Tailwind's default spacing scale (4px increments) already matches the
+ * Android spacing scale (4/8/12/16/20/24/32/40/48 = p-1..p-12), so it is not
+ * redefined here — only colors, radii, and font are custom tokens.
+ */
+
+@theme {
+  --font-sans: 'Sora', ui-sans-serif, system-ui, -apple-system, sans-serif;
+
+  --color-primary: #5a5af5;
+  --color-primary-foreground: #ffffff;
+  --color-primary-container: #e4e3ff;
+  --color-secondary: #a855f7;
+  --color-secondary-foreground: #ffffff;
+  --color-secondary-container: #f3e4ff;
+
+  --color-background: #f3f4fb;
+  --color-surface: #ffffff;
+  --color-surface-variant: #ececfe;
+  --color-card: #ffffff;
+  --color-card-elevated: #ffffff;
+  --color-divider: #e2e1f5;
+  --color-disabled: #c8c7dd;
+  --color-scrim: rgb(22 20 40 / 0.5);
+
+  --color-text-primary: #161428;
+  --color-text-secondary: #514d6b;
+  --color-text-tertiary: #837f9c;
+  --color-text-oncolor: #ffffff;
+
+  --color-success: #16a34a;
+  --color-success-container: #dcfce7;
+  --color-warning: #d97706;
+  --color-warning-container: #fef3c7;
+  --color-error: #dc2626;
+  --color-error-container: #fee2e2;
+  --color-info: #2563eb;
+  --color-info-container: #dbeafe;
+
+  --radius-card: 24px;
+  --radius-dialog: 28px;
+  --radius-button: 9999px;
+  --radius-chip: 9999px;
+  --radius-field: 16px;
+
+  --ease-motion: cubic-bezier(0.2, 0, 0, 1);
+}
+
+/* Manual dark-mode toggle: `dark:` variant matches `.dark` on any ancestor. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@layer base {
+  :root.dark {
+    --color-background: #0f0f1a;
+    --color-surface: #17172a;
+    --color-surface-variant: #1e1e35;
+    --color-card: #17172a;
+    --color-card-elevated: #1c1c33;
+    --color-divider: #2b2b46;
+    --color-disabled: #3a3a57;
+    --color-scrim: rgb(0 0 0 / 0.6);
+
+    --color-primary: #8f8fff;
+    --color-primary-foreground: #0f0f1a;
+    --color-primary-container: #2c2c66;
+    --color-secondary: #d6a6ff;
+    --color-secondary-foreground: #0f0f1a;
+    --color-secondary-container: #3a2c66;
+
+    --color-text-primary: #f3f4fb;
+    --color-text-secondary: #c3c1dc;
+    --color-text-tertiary: #8f8ca8;
+    --color-text-oncolor: #0f0f1a;
+
+    --color-success: #4ade80;
+    --color-success-container: #14532d;
+    --color-warning: #fbbf24;
+    --color-warning-container: #78350f;
+    --color-error: #f87171;
+    --color-error-container: #7f1d1d;
+    --color-info: #60a5fa;
+    --color-info-container: #1e3a8a;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not(.light):not(.dark) {
+      --color-background: #0f0f1a;
+      --color-surface: #17172a;
+      --color-surface-variant: #1e1e35;
+      --color-card: #17172a;
+      --color-card-elevated: #1c1c33;
+      --color-divider: #2b2b46;
+      --color-disabled: #3a3a57;
+      --color-scrim: rgb(0 0 0 / 0.6);
+
+      --color-primary: #8f8fff;
+      --color-primary-foreground: #0f0f1a;
+      --color-primary-container: #2c2c66;
+      --color-secondary: #d6a6ff;
+      --color-secondary-foreground: #0f0f1a;
+      --color-secondary-container: #3a2c66;
+
+      --color-text-primary: #f3f4fb;
+      --color-text-secondary: #c3c1dc;
+      --color-text-tertiary: #8f8ca8;
+      --color-text-oncolor: #0f0f1a;
+
+      --color-success: #4ade80;
+      --color-success-container: #14532d;
+      --color-warning: #fbbf24;
+      --color-warning-container: #78350f;
+      --color-error: #f87171;
+      --color-error-container: #7f1d1d;
+      --color-info: #60a5fa;
+      --color-info-container: #1e3a8a;
+    }
+  }
+}

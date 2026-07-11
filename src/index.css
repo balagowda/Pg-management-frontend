@@ -1,0 +1,34 @@
+@import 'tailwindcss';
+@import './design/tokens.css';
+@plugin 'tailwindcss-animate';
+
+@import '@fontsource/sora/400.css';
+@import '@fontsource/sora/500.css';
+@import '@fontsource/sora/600.css';
+@import '@fontsource/sora/700.css';
+
+@layer base {
+  * {
+    border-color: var(--color-divider);
+  }
+
+  html {
+    color-scheme: light;
+  }
+
+  html.dark {
+    color-scheme: dark;
+  }
+
+  body {
+    margin: 0;
+    font-family: var(--font-sans);
+    background-color: var(--color-background);
+    color: var(--color-text-primary);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  #root {
+    min-height: 100svh;
+  }
+}
